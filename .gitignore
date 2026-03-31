@@ -1,0 +1,25 @@
+# Excluded from this repo (TheTom's original project files, not part of the MLX port)
+benchmarks/
+docs/
+scripts/
+data/
+profiles/
+proof/
+benchmark-results-raw/
+PLAN.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Environment
+.env
+.venv
+venv/
+.DS_Store

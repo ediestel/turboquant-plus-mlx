@@ -1,0 +1,38 @@
+[project]
+name = "turboquant-plus-mlx"
+version = "0.1.0"
+description = "TurboQuant MLX port: KV cache compression via PolarQuant + QJL on Apple Silicon"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+]
+
+[project.optional-dependencies]
+mlx = [
+    "mlx>=0.22.0",
+]
+mlx-lm = [
+    "mlx>=0.22.0",
+    "mlx-lm>=0.20.0",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+bench = [
+    "matplotlib",
+]
+all = [
+    "turboquant-plus-mlx[mlx,mlx-lm,dev,bench]",
+]
+
+[tool.setuptools.packages.find]
+include = ["turboquant*"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
