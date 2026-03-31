@@ -119,6 +119,36 @@ compressed = comp.compress(k_cache, v_cache)
 
 ---
 
+## Benchmark Results
+
+Hardware: Apple M5 Max 128GB
+
+### Compression vs Quality (synthetic, d=128, n=1000 unit vectors)
+
+| Cache Type | Eff. Bits | Compression | MSE | Cosine Sim |
+|------------|-----------|-------------|-----|------------|
+| fp16 | 16 | 1.0× | 0.0 | 1.000 |
+| turbo2 | 2.0 | 6.4× | 0.005283 | 0.775 |
+| turbo2.5 | 2.5 | 4.9× | 0.003111 | 0.847 |
+| turbo3 | 3.0 | 4.6× | 0.001888 | 0.903 |
+| turbo3.5 | 3.5 | 3.8× | 0.000913 | 0.947 |
+| turbo4 | 4.0 | 3.6× | 0.000754 | 0.959 |
+
+### Temporal Decay (3→2 bit requantization, synthetic, d=128, n=1000)
+
+| Method | Cosine Sim | MSE | vs turbo3 |
+|--------|------------|-----|-----------|
+| turbo3 | 0.983 | 0.034 | baseline |
+| direct 2-bit | 0.940 | 0.120 | 3.51× worse MSE |
+| decay 3→2 | 0.940 | 0.145 | 4.23× worse MSE |
+
+Decay cosine sim 0.940 > 0.80 threshold — viable. Requantization adds only marginal error over direct 2-bit.
+
+### Note on Real-Model PPL
+
+Norm correction (`norm_correction=True`) is implemented throughout — NumPy and MLX — and is required for correct reconstruction on real KV tensors. Real-model PPL validation is pending.
+
+---
 
 ## Install
 
