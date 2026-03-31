@@ -121,7 +121,7 @@ compressed = comp.compress(k_cache, v_cache)
 
 ## Benchmark Results
 
-Hardware: Apple M5 Max 128GB
+Hardware: Apple Macbook Pro
 
 ### Compression vs Quality (synthetic, d=128, n=1000 unit vectors)
 
