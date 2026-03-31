@@ -284,18 +284,21 @@ turboquant/
 │   ├── qjl.py            # QJLMLX (1-bit sign quantization)
 │   ├── turboquant.py     # TurboQuantMLX + TurboQuantMSEMLX
 │   ├── kv_cache.py       # KVCacheCompressorMLX (batched layer/head compression)
+│   ├── adaptive_kv_cache.py  # AdaptiveKVCacheCompressorMLX (+ adaptive/decay/MoE)
+│   ├── temporal_decay.py     # apply_eviction_mlx, decay_scores_mlx + re-exports
 │   ├── outlier.py        # OutlierTurboQuantMLX (2.5-bit, 3.5-bit)
 │   ├── utils.py          # Bit packing via NumPy interop
 │   └── kernels/
 │       ├── hadamard.metal    # Custom Metal WHT kernel (shared-memory butterfly)
-│       └── quantize.metal    # Fused Metal kernel: rotate → normalize → centroid lookup
+│       ├── quantize.metal    # Fused Metal kernel: rotate → normalize → centroid lookup
+│       └── requantize.metal  # Fused requantize kernel: 3→2 bit, 4→3 bit (temporal decay)
 └── integrations/
     └── mlx_lm.py         # TurboQuantKVCache — drop-in for mlx-lm generate()
 
 tests/
 ├── test_mlx/             # MLX parity tests — verify MLX output matches audited NumPy
 │                         # reference after each improvement. Full package retained for this.
-└── (17 test files, 654 tests total)
+└── (18 test files, 698 tests total)
 ```
 
 ---
@@ -313,7 +316,7 @@ tests/
 | Adaptive bit allocation | ✅ | Per-head sensitivity-aware bits — `adaptive_bits.py`, 92 new tests |
 | Temporal decay | ✅ | Progressive requantization of old tokens — `temporal_decay.py`, cosine sim >0.80 validated |
 | MoE-aware compression | ✅ | Per-expert bit budgets from routing stats — `moe_compression.py` |
-| MLX mirrors for extensions | ⏳ | `mlx/temporal_decay.py`, `mlx/adaptive_kv_cache.py`, Metal requantize kernel |
+| MLX mirrors for extensions | ✅ | `mlx/temporal_decay.py`, `mlx/adaptive_kv_cache.py`, Metal requantize kernel (3→2, 4→3 bit) |
 | Sensitivity calibration | ⏳ | `SensitivityCalibratedPolicy` — auto-calibrate from forward pass attention entropy |
 
 ---
