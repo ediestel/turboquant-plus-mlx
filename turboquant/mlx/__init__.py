@@ -14,6 +14,15 @@ from turboquant.mlx.turboquant import TurboQuantMLX, TurboQuantMSEMLX, Compresse
 from turboquant.mlx.kv_cache import KVCacheCompressorMLX, CompressedKVCacheMLX
 from turboquant.mlx.outlier import OutlierTurboQuantMLX
 from turboquant.mlx.utils import pack_bits_mlx, unpack_bits_mlx, pack_indices_mlx
+from turboquant.mlx.adaptive_kv_cache import AdaptiveKVCacheCompressorMLX
+from turboquant.mlx.temporal_decay import (
+    apply_eviction_mlx,
+    decay_scores_mlx,
+    DecayConfig,
+    DecayMode,
+    DecaySchedule,
+    TemporalDecayScheduler,
+)
 
 __all__ = [
     "random_rotation_dense_mlx",
@@ -34,4 +43,11 @@ __all__ = [
     "pack_bits_mlx",
     "unpack_bits_mlx",
     "pack_indices_mlx",
+    "AdaptiveKVCacheCompressorMLX",
+    "apply_eviction_mlx",
+    "decay_scores_mlx",
+    "DecayConfig",
+    "DecayMode",
+    "DecaySchedule",
+    "TemporalDecayScheduler",
 ]

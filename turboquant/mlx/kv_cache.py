@@ -177,4 +177,7 @@ class KVCacheCompressorMLX:
             "compression_ratio": original_bytes / compressed_bytes,
             "k_bits_per_value": self.k_bits,
             "v_bits_per_value": self.v_bits,
+            "adaptive_bits_enabled": False,
+            "temporal_decay_enabled": False,
+            "moe_routing_enabled": False,
         }
