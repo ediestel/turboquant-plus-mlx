@@ -7,6 +7,8 @@ KV cache shape: (num_layers, num_heads, seq_len, head_dim)
 Quantization is along head_dim — each (head_dim,) vector is quantized independently.
 """
 
+from __future__ import annotations
+
 import numpy as np
 from dataclasses import dataclass, field
 from typing import Optional
@@ -32,6 +34,11 @@ class CompressedKVCache:
     head_dim: int = 0
     k_bit_width: int = 0
     v_bit_width: int = 0
+
+    # Set by AdaptiveKVCacheCompressor: effective integer bit widths per (layer, head).
+    # None when the base compressor was used (all heads at k_bit_width / v_bit_width).
+    k_bits_matrix: Optional[np.ndarray] = None  # shape (num_layers, num_heads), dtype int
+    v_bits_matrix: Optional[np.ndarray] = None  # shape (num_layers, num_heads), dtype int
 
 
 class KVCacheCompressor:

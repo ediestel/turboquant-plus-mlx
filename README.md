@@ -277,6 +277,8 @@ turboquant/
 │   ├── __init__.py       # get_backend(), set_default_backend(), default_backend()
 │   ├── numpy_backend.py  # NumPy/SciPy adapter (default, always available)
 │   └── mlx_backend.py    # MLX adapter (Apple Silicon, optional)
+├── bit_budget.py         # BitBudgetPolicy protocol, UniformPolicy, LayerHeadPolicy, SensitivityCalibratedPolicy
+├── adaptive_kv_cache.py  # AdaptiveKVCacheCompressor orchestrator + TieredDecayPolicy
 ├── mlx/                  # MLX-native GPU implementations
 │   ├── rotation.py       # mx.linalg.qr rotation + butterfly Walsh-Hadamard
 │   ├── codebook.py       # Lloyd's algorithm → mx.array centroids
@@ -298,7 +300,7 @@ turboquant/
 tests/
 ├── test_mlx/             # MLX parity tests — verify MLX output matches audited NumPy
 │                         # reference after each improvement. Full package retained for this.
-└── (18 test files, 698 tests total)
+└── (21 test files, 781 tests total)
 ```
 
 ---
@@ -317,7 +319,7 @@ tests/
 | Temporal decay | ✅ | Progressive requantization of old tokens — `temporal_decay.py`, cosine sim >0.80 validated |
 | MoE-aware compression | ✅ | Per-expert bit budgets from routing stats — `moe_compression.py` |
 | MLX mirrors for extensions | ✅ | `mlx/temporal_decay.py`, `mlx/adaptive_kv_cache.py`, Metal requantize kernel (3→2, 4→3 bit) |
-| Sensitivity calibration | ⏳ | `SensitivityCalibratedPolicy` — auto-calibrate from forward pass attention entropy |
+| Sensitivity calibration | ✅ | `SensitivityCalibratedPolicy` in `bit_budget.py` — entropy-based per-head calibration; `AdaptiveKVCacheCompressor` orchestrator actually applies policies in `compress()`; `TieredDecayPolicy`; mlx-lm `adaptive=True` wiring |
 
 ---
 
