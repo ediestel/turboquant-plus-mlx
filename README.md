@@ -247,7 +247,7 @@ Issues and PRs welcome. Main areas where help is needed:
 
 ## Attribution
 
-This MLX port is based on [TheTom/turboquant-plus](https://github.com/TheTom/turboquant_plus) (Apache 2.0). The original Python reference implementation and llama.cpp C port were written by Tom Turney.
+This MLX port is based on [TheTom/turboquant-plus](https://github.com/TheTom/turboquant_plus) (Apache 2.0). The original Python reference implementation was written by Tom Turney.
 
 This repo extends the original with:
 - MLX-native GPU backend for Apple Silicon (`turboquant/mlx/`)
