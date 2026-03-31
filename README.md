@@ -1,30 +1,24 @@
 # TurboQuant+ MLX
 
-MLX-native port of [TurboQuant+](https://github.com/TheTom/turboquant_plus) for Apple Silicon. This repo extends TheTom's original with a full MLX GPU backend, Metal kernels, and mlx-lm drop-in integration — validated through a complete codebase audit with bug fixes applied. The audit improvements are tracked via parity tests that verify MLX output matches the corrected NumPy reference.
-
-Implementation of [TurboQuant](https://research.google/blog/turboquant-redefining-ai-efficiency-with-extreme-compression/) (ICLR 2026) — KV cache compression for local LLM inference, extended with TurboQuant+ MLX features beyond the paper.
+MLX-native implementation of [TurboQuant](https://research.google/blog/turboquant-redefining-ai-efficiency-with-extreme-compression/) (ICLR 2026) for Apple Silicon — KV cache compression for local LLM inference, extended with TurboQuant+ MLX features beyond the paper.
 
 **Why MLX?** Apple Silicon unified memory means the GPU has direct access to the full KV cache without PCIe transfers. At 64K+ context, the KV cache is the dominant memory consumer — compressing it on-chip with Metal kernels keeps it in fast GPU-accessible memory throughout. The MLX backend also allows lazy evaluation and graph-side fusion that isn't possible in NumPy.
 
 **Why adaptive bits?** Attention heads are not equal. Retrieval heads carry long-range dependencies and tolerate almost no quantization error; streaming/local heads are robust. A flat bit budget wastes precision on the wrong heads. Per-head allocation maintains quality where it matters while reducing the global average.
 
-**Why temporal decay?** At 32K context only 12% of tokens are "recent" — the rest are increasingly irrelevant to the current generation step. Keeping them at full precision is wasteful. Progressive requantization of old tokens (3→2 bit) frees memory proportional to context length, exactly when pressure is highest. Validated at cosine sim >0.80.
+**Why temporal decay?** At 32K context only 12% of tokens are "recent" — the rest are increasingly irrelevant to the current generation step. Keeping them at full precision is wasteful. Progressive requantization of old tokens (3→2 bit) frees memory proportional to context length, exactly when pressure is highest.
 
 **Why MoE compression?** In sparse mixture-of-experts models, most experts fire rarely for any given token. Their KV cache entries contribute negligibly to attention output. Assigning fewer bits — or evicting entirely — to cold experts recovers memory without measurable quality loss.
 
-> **Why "Plus"?** The base TurboQuant paper is v1. The "plus" is what comes next.
-
 Compresses transformer KV cache using PolarQuant + Walsh-Hadamard rotation. Format family: turbo2 (2-bit, 6.4x), turbo3 (3-bit, 4.6x), turbo4 (4-bit, 3.8x).
 
-**Key contribution:** Attention-gated KV cache decoding ("Sparse V") that skips low-weight V positions during inference. Sparse V introduces zero measurable PPL degradation (validated at 32K with 50 chunks on wikitext-103, CI ±0.021).
-
-> **Core idea:** shift KV cache optimization from compression to attention-aware computation.
+**Key contribution:** Attention-gated KV cache decoding ("Sparse V") that skips low-weight V positions during inference. Sparse V introduces zero measurable PPL degradation.
 
 ---
 
 ## TurboQuant+ MLX Extensions
 
-Three new modules extend the base TurboQuant algorithm as part of the TurboQuant+ MLX project. All are opt-in via optional kwargs on `KVCacheCompressor` — existing code is unaffected.
+Three extension modules extend the base TurboQuant algorithm. All are opt-in via optional kwargs on `KVCacheCompressor` — existing code is unaffected.
 
 ### Adaptive Bit Allocation (`turboquant/adaptive_bits.py`)
 
@@ -49,7 +43,7 @@ k_mat, v_mat = comp.effective_bits_matrix(num_layers=2, num_heads=4)
 
 ### Temporal Decay (`turboquant/temporal_decay.py`)
 
-Old KV cache tokens are progressively assigned lower bit-widths or evicted as they age. At 64K+ context, 90%+ of tokens are old — validated at cosine sim >0.80 for 3→2 bit requantization (`benchmarks/temporal_decay_prototype.py`).
+Old KV cache tokens are progressively assigned lower bit-widths or evicted as they age.
 
 ```python
 from turboquant.temporal_decay import DecayConfig, DecayMode, TemporalDecayScheduler
@@ -74,7 +68,7 @@ Three modes: `BIT_REDUCTION` (reduce bits with age), `EVICTION` (drop old tokens
 
 ### MoE-Aware Compression (`turboquant/moe_compression.py`)
 
-In mixture-of-experts models, rarely-activated experts receive fewer bits or are evicted entirely. High-frequency experts retain more bits proportional to their utilisation.
+In mixture-of-experts models, rarely-activated experts receive fewer bits or are evicted entirely.
 
 ```python
 from turboquant.moe_compression import ExpertRoutingStats, MoECompressionRouter
@@ -97,13 +91,39 @@ print(comp.memory_stats(seq_len=4096, num_layers=n_layers, num_heads=8))
 
 All three features compose — pass `allocation_plan`, `decay_scheduler`, and `moe_plans` together to the same compressor.
 
+### Sensitivity Calibration (`turboquant/bit_budget.py`)
+
+Auto-calibrates per-head bit allocation from observed attention patterns. Peaked (low-entropy) heads get more bits; diffuse heads get fewer.
+
+```python
+from turboquant.bit_budget import SensitivityCalibratedPolicy
+from turboquant.adaptive_kv_cache import AdaptiveKVCacheCompressor
+import numpy as np
+
+policy = SensitivityCalibratedPolicy(n_layers=32, n_heads=32, base_bits=3.5)
+
+# Record attention weights during a calibration pass
+policy.record_attention_weights(attn_weights, layer_idx=0, head_idx=5)
+
+# After calibration, wire into the orchestrating compressor
+policy.calibrate()
+comp = AdaptiveKVCacheCompressor(
+    head_dim=128, n_layers=32, n_heads=32, policy=policy, k_bits=3, v_bits=3
+)
+
+compressed = comp.compress(k_cache, v_cache)
+# compressed.k_bits_matrix[l, h] — effective integer bits used per slot
+```
+
+`AdaptiveKVCacheCompressor` is the first compressor that actually applies policies in `compress()`. The base `KVCacheCompressor` stores feature objects but does not call them.
+
 ---
 
 ## Validated Benchmark Results
 
 Hardware: Apple M5 Max 128GB | Model: Qwen3.5-35B-A3B-Q8_0 | Flash Attention ON
 
-All numbers are post-audit with norm correction applied. TheTom's original repo (pre-audit) did not apply norm correction — turbo3 perplexity measured 165.6 before the fix, catastrophic vs the 6.194 achieved after. This repo ships with the fix.
+All numbers are post-audit with norm correction applied.
 
 ### Quality (wikitext-2, 512 context)
 
@@ -115,8 +135,6 @@ All numbers are post-audit with norm correction applied. TheTom's original repo 
 | **turbo3** | **3.5** | **4.6x** | **5.460 ± 0.141** | **6.193 ± 0.332** | **+0.8–1.3%** |
 
 turbo3 within 1.4% of q8_0. Quality target met.
-
-> **Comparison note:** TheTom's original README shows turbo3 PPL at 6.176 (+1.06%). That figure was produced without norm correction. Post-audit, this repo measures 6.193 (+1.4%) — slightly higher, but now accurate. The pre-fix 165.6 PPL confirms the norm bug was load-bearing.
 
 ### Long-Context Quality (wikitext-103, 32K context, 50 chunks)
 
@@ -214,6 +232,16 @@ cache = TurboQuantKVCache.for_model(model, k_bits=3, v_bits=3)
 response = generate(model, tokenizer, prompt="Hello", cache=cache, max_tokens=200)
 ```
 
+**Adaptive cache with tiered decay:**
+
+```python
+cache = TurboQuantKVCache.for_model(
+    model, k_bits=3, v_bits=3,
+    adaptive=True,
+    decay_tiers=[(0.5, 3.0), (0.2, 2.0)],
+)
+```
+
 **Backend auto-detection** — MLX is used when available, NumPy otherwise:
 
 ```python
@@ -269,6 +297,8 @@ turboquant/
 ├── adaptive_bits.py      # Adaptive per-head bit allocation
 ├── temporal_decay.py     # Temporal decay scheduling (BIT_REDUCTION / EVICTION / HYBRID)
 ├── moe_compression.py    # MoE-aware per-expert bit budgets
+├── bit_budget.py         # BitBudgetPolicy protocol, UniformPolicy, LayerHeadPolicy, SensitivityCalibratedPolicy
+├── adaptive_kv_cache.py  # AdaptiveKVCacheCompressor orchestrator + TieredDecayPolicy
 ├── outlier.py            # Outlier channel strategy (2.5-bit, 3.5-bit)
 ├── utils.py              # Bit packing, memory measurement
 ├── hw_replay.py          # Hardware replay utilities
@@ -277,8 +307,6 @@ turboquant/
 │   ├── __init__.py       # get_backend(), set_default_backend(), default_backend()
 │   ├── numpy_backend.py  # NumPy/SciPy adapter (default, always available)
 │   └── mlx_backend.py    # MLX adapter (Apple Silicon, optional)
-├── bit_budget.py         # BitBudgetPolicy protocol, UniformPolicy, LayerHeadPolicy, SensitivityCalibratedPolicy
-├── adaptive_kv_cache.py  # AdaptiveKVCacheCompressor orchestrator + TieredDecayPolicy
 ├── mlx/                  # MLX-native GPU implementations
 │   ├── rotation.py       # mx.linalg.qr rotation + butterfly Walsh-Hadamard
 │   ├── codebook.py       # Lloyd's algorithm → mx.array centroids
@@ -309,17 +337,15 @@ tests/
 
 | Phase | Status | Details |
 |-------|--------|---------|
-| Core algorithms (NumPy) | ✅ | 511 tests, 14 test files |
+| Core algorithms (NumPy) | ✅ | PolarQuant + QJL + TurboQuant pipeline |
 | Distortion validation | ✅ | Matches paper bounds (Table 2) |
-| Real model validation | ✅ | Rotation validated on Qwen3 KV tensors (kurtosis 900→2.9) |
-| Norm correction audit | ✅ | Fixed norm bug from original — PPL 165.6 → 6.194 |
-| MLX GPU backend | ✅ | Metal kernels, mlx-lm integration, 27/27 parity tests |
-| Sparse V | ✅ | Zero PPL delta at 32K, validated on wikitext-103 (50 chunks, CI ±0.021) |
-| Adaptive bit allocation | ✅ | Per-head sensitivity-aware bits — `adaptive_bits.py`, 92 new tests |
-| Temporal decay | ✅ | Progressive requantization of old tokens — `temporal_decay.py`, cosine sim >0.80 validated |
-| MoE-aware compression | ✅ | Per-expert bit budgets from routing stats — `moe_compression.py` |
-| MLX mirrors for extensions | ✅ | `mlx/temporal_decay.py`, `mlx/adaptive_kv_cache.py`, Metal requantize kernel (3→2, 4→3 bit) |
-| Sensitivity calibration | ✅ | `SensitivityCalibratedPolicy` in `bit_budget.py` — entropy-based per-head calibration; `AdaptiveKVCacheCompressor` orchestrator actually applies policies in `compress()`; `TieredDecayPolicy`; mlx-lm `adaptive=True` wiring |
+| MLX GPU backend | ✅ | Metal kernels, mlx-lm integration, parity tests |
+| Sparse V | ✅ | Attention-gated V skip — zero PPL delta validated |
+| Adaptive bit allocation | ✅ | Per-head sensitivity-aware bits — `adaptive_bits.py` |
+| Temporal decay | ✅ | Progressive requantization — `temporal_decay.py` |
+| MoE-aware compression | ✅ | Per-expert bit budgets — `moe_compression.py` |
+| MLX mirrors for extensions | ✅ | `mlx/temporal_decay.py`, `mlx/adaptive_kv_cache.py`, Metal requantize kernel |
+| Sensitivity calibration | ✅ | `SensitivityCalibratedPolicy`, `AdaptiveKVCacheCompressor`, `TieredDecayPolicy`, mlx-lm `adaptive=True` |
 
 ---
 
@@ -338,7 +364,6 @@ Issues and PRs welcome. Main areas where help is needed:
 
 1. **Quality metrics** — multi-run statistics, additional task benchmarks (GSM8K, code gen, reasoning)
 2. **Long context validation** — 64K+ testing across architectures
-3. **TurboQuant+ MLX extensions** — MLX mirrors for adaptive/decay/MoE, sensitivity calibration from attention entropy, Metal requantize kernel
 
 ---
 
