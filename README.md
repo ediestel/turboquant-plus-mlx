@@ -1,4 +1,6 @@
-# TurboQuant+
+# TurboQuant+ MLX
+
+MLX-native port of [TurboQuant+](https://github.com/TheTom/turboquant_plus) for Apple Silicon. This repo extends TheTom's original with a full MLX GPU backend, Metal kernels, and mlx-lm drop-in integration — validated through a complete codebase audit with bug fixes applied. The audit improvements are tracked via parity tests that verify MLX output matches the corrected NumPy reference.
 
 Implementation of [TurboQuant](https://research.google/blog/turboquant-redefining-ai-efficiency-with-extreme-compression/) (ICLR 2026) — KV cache compression for local LLM inference, with planned extensions beyond the paper.
 
