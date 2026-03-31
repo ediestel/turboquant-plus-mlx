@@ -645,12 +645,6 @@ Issues and PRs welcome. The main areas where help is needed:
 4. **Quality metrics** — multi-run statistics, additional task benchmarks (GSM8K, code gen, reasoning)
 5. **Long context validation** — 64K+ testing across architectures
 
-## Support
-
-If you find this work useful, you can support it via [GitHub Sponsors](https://github.com/sponsors/TheTom) or BTC:
-
-BTC: bc1qsfaaf6mkz2yxx2vavg2n0zgsf3qj25uh94t83rwuq7de67dey05sc3tgjx
-
 ## Attribution
 
 This MLX port is based on [TheTom/turboquant-plus](https://github.com/TheTom/turboquant_plus) (Apache 2.0). The original Python reference implementation and llama.cpp C port were written by Tom Turney.
@@ -664,4 +658,5 @@ This repo extends the original with:
 
 Apache License 2.0 — see [LICENSE](LICENSE).
 
+MLX port and extensions Copyright 2026 Eckhart Diestel.
 Based on Google Research's TurboQuant paper (arXiv 2504.19874) and TheTom/turboquant-plus.
